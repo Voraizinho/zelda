@@ -91,10 +91,18 @@ CLANG = UCRT / 'clang.exe' if WIN else on_path('clang')
 NINJA = UCRT / 'ninja.exe' if WIN else on_path('ninja')
 SDL3_DLLS = [UCRT / 'SDL3.dll', UCRT / 'libiconv-2.dll', UCRT / 'libopus-0.dll'] if WIN else []
 
+DARWIN = sys.platform == 'darwin'
+
 # Flags for generated code as LAS Recomp builds it (Makefile GENFLAGS, Windows), plus -march for the FP/SIMD lowering.
-GEN_FLAGS = ['-O1', '-fno-strict-aliasing', '-Wno-return-type', '-Wno-unused-label', '-fvisibility=hidden',
-             '-march=x86-64-v3']
-RT_FLAGS = ['-O2', '-g', '-Wall', '-fno-strict-aliasing', '-march=x86-64-v3']
+if DARWIN:
+    GEN_FLAGS = ['-O1', '-fno-strict-aliasing', '-Wno-return-type', '-Wno-unused-label', '-fvisibility=hidden',
+                 '-arch', 'arm64', '-I/opt/homebrew/include']
+    RT_FLAGS = ['-O2', '-g', '-Wall', '-fno-strict-aliasing', '-arch', 'arm64', '-I/opt/homebrew/include']
+else:
+    GEN_FLAGS = ['-O1', '-fno-strict-aliasing', '-Wno-return-type', '-Wno-unused-label', '-fvisibility=hidden',
+                 '-march=x86-64-v3']
+    RT_FLAGS = ['-O2', '-g', '-Wall', '-fno-strict-aliasing', '-march=x86-64-v3']
+
 if WIN:
     # _WIN32_WINNT: Windows 10, the port's minimum. MSYS2's headers default to it, llvm-mingw's (the release toolchain)
     # to Windows 7, which hides the per-monitor DPI functions gfx_window_win.c and dpi_probe_win.c call.
@@ -103,6 +111,12 @@ if WIN:
     LINK_FLAGS = ['-fuse-ld=lld', '-Wl,--stack,16777216', '-Xlinker', '"--Map=$builddir/totk.map"']   # the map feeds tools/prof_report.py
     LINK_LIBS = ['-lpsapi', '-lbcrypt', '-lvulkan-1', '-luser32', '-lgdi32', '-ldwmapi', '-limm32', '-lwinmm', '-lSDL3', '-lopus', '-l:libdav1d.a', '-l:libvpx.a', '-l:libzstd.a', '-l:libstdc++.a', '-l:libwinpthread.a']   # Vulkan back end; libvpx static (movies); libzstd static (resolution.c)
     VMA_INCLUDE = UCRT.parent / 'include' / 'vma'   # vk_mem_alloc.h; MSYS2 package vulkan-memory-allocator
+elif DARWIN:
+    LINK_FLAGS = ['-arch', 'arm64', '-L/opt/homebrew/lib', "'-Wl,-rpath,@executable_path'",
+                  "'-Wl,-rpath,/opt/homebrew/lib'", '"-Wl,-map,$builddir/totk.map"']
+    LINK_LIBS = ['-L/opt/homebrew/lib', '-lvulkan', '-lSDL3', '-lopus', '-ldav1d', '-lvpx', '-lzstd', '-lc++', '-lm', '-lpthread',
+                 '-framework', 'Metal', '-framework', 'IOSurface', '-framework', 'QuartzCore']
+    VMA_INCLUDE = Path('/opt/homebrew/include')
 else:
     # -no-pie: the lifted modules' function tables (hundreds of thousands of pointers) need no load-time relocation.
     # $ORIGIN: a libSDL3.so.0 next to totk comes before the system's (the release's portable folder).

@@ -53,6 +53,12 @@ pulo() { printf '  %s\n' "$*"; }
 
 # ---------------------------------------------------------------- preflight (looks only)
 faltam=0
+IS_DARWIN=0
+if [ "$(uname -s)" = "Darwin" ]; then
+    IS_DARWIN=1
+    export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:/opt/homebrew/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+fi
+
 precisa() {
     if command -v "$1" >/dev/null 2>&1; then
         printf '  [ok]    %s\n' "$1"
@@ -74,10 +80,18 @@ echo "$(L 'Ocarina Recomp: verificando este PC (nada será alterado)' 'Ocarina R
 echo
 precisa git 'install git'
 precisa clang 'install clang'
-precisa ld.lld 'install lld'
+if [ "$IS_DARWIN" = 1 ]; then
+    printf '  [ok]    ld (Apple ld64)\n'
+else
+    precisa ld.lld 'install lld'
+fi
 precisa ninja 'install ninja'
 precisa pkg-config 'install pkgconf'
-precisa sha256sum 'coreutils'
+if [ "$IS_DARWIN" = 1 ] && command -v shasum >/dev/null 2>&1; then
+    printf '  [ok]    shasum (macOS)\n'
+else
+    precisa sha256sum 'coreutils'
+fi
 if command -v python3.12 >/dev/null 2>&1 || command -v uv >/dev/null 2>&1; then
     printf '  [ok]    python 3.12 (or uv)\n'
 else
@@ -94,15 +108,15 @@ pkg sdl3 'install sdl3'
 pkg opus 'install opus'
 pkg dav1d 'install dav1d'
 pkg vpx 'install libvpx'
-if [ -f /usr/include/zstd.h ]; then
+if [ -f /usr/include/zstd.h ] || [ -f /opt/homebrew/include/zstd.h ] || [ -f /usr/local/include/zstd.h ] || pkg-config --exists libzstd 2>/dev/null; then
     printf '  [ok]    zstd (header)\n'
 else
     printf '  [falta] zstd  (install zstd)\n'
     faltam=$((faltam + 1))
 fi
 # The loader's vulkan.pc is not the header: on Arch and CachyOS they are separate packages (issue #41)
-vk_inc=$(pkg-config --variable=includedir vulkan 2>/dev/null)
-if [ -f /usr/include/vulkan/vulkan.h ] || { [ -n "$vk_inc" ] && [ -f "$vk_inc/vulkan/vulkan.h" ]; }; then
+vk_inc=$(pkg-config --variable=includedir vulkan 2>/dev/null || true)
+if [ -f /usr/include/vulkan/vulkan.h ] || [ -f /opt/homebrew/include/vulkan/vulkan.h ] || [ -f /usr/local/include/vulkan/vulkan.h ] || { [ -n "$vk_inc" ] && [ -f "$vk_inc/vulkan/vulkan.h" ]; }; then
     printf '  [ok]    vulkan (header)\n'
 else
     printf '  [falta] vulkan/vulkan.h  (install vulkan-headers)\n'

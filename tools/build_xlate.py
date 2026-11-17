@@ -181,8 +181,9 @@ def main() -> None:
         shutil.copy2(XLATE / name, work / name)
     out = BUILD / "publish"
     shutil.rmtree(out, ignore_errors=True)
+    rid = "win-x64" if WIN else "osx-arm64" if sys.platform == "darwin" else "linux-x64"
     cmd = [
-        dotnet, "publish", str(work / "totk_xlate.csproj"), "-c", "Release", "-r", "win-x64" if WIN else "linux-x64",
+        dotnet, "publish", str(work / "totk_xlate.csproj"), "-c", "Release", "-r", rid,
         "-p:PublishAot=true", "-p:InvariantGlobalization=true", f"-p:RyuSrc={src}", "-o", str(out),
     ]
     if a.llvm:
